@@ -19,11 +19,11 @@ Requirements:
   Optional:
     parallel (speeds up ocr on multiple cores)
 
-    Usage:
+Usage:
 
        pdfocr -i|--input input.pdf [options...]
 
-    Options:
+Options:
 
       -l, --lang "LANG"     set the language(s) for tesseract; check available
                             languages with: tesseract --list-langs; put multiple
