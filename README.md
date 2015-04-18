@@ -45,8 +45,8 @@ Options:
                               full  
                             Default: full
                             note: it is assumed that required files are in the
-                            TMPDIR_PATH; 'full' and 'merge' delete intermediate
-                            files by default
+                            TMPDIR_PATH; modes 'split' and 'ocr' don't delete
+                            their output intermediate files
 
       -c, --tess-config     set the tesseract configuration; default: pdf
 

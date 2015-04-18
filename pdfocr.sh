@@ -1,9 +1,5 @@
 #! /bin/bash
 
-#Copyright (c) 2015 Michał Nowotnik
-
-#See LICENSE.txt for the usage notice and copying permissions
-
 INPUT=
 OUTPUT=
 TESS_CONFIG=pdf
@@ -26,12 +22,11 @@ function pdfocr {
     exit
   fi
 
-  check_req
-
   parse_args $*
 
-  init
+  check_req
 
+  init
 
   if [[ $MODE = @(full|split) ]];then
     echo Running ghostscript on $INPUT
@@ -40,8 +35,8 @@ function pdfocr {
       -o "$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT" -f "$INPUT" > /dev/null
 
    try "Error while converting $INPUT"
+   exit_on_mode $MODE
   fi
-
 
   if [[ $MODE = @(full|ocr) ]]; then
 
@@ -65,20 +60,41 @@ function pdfocr {
     fi
 
 
+   exit_on_mode $MODE
   fi
 
-  echo merging into $OUTPUT
-  pdfunite "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf $OUTPUT 
+  if [[ $MODE = @(full|merge) ]]; then
+    echo merging into $OUTPUT
+    pdfunite "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf $OUTPUT 
+    try "Error while merging "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf into $OUTPUT"
+  fi
 
   if [ $KEEP_TMP = false ]; then
-    rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
-    rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
+
+    if [ $MODE != split ]; then
+      rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
+    fi
+    if [ $MODE != ocr ]; then
+      rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
+    fi
+
   fi
+
+  echo Finished
 
 }
 
 function run_tess {
     tesseract "$1" "${1%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG
+}
+
+function exit_on_mode {
+
+  if [[ $1 = @(split|ocr) ]];then
+    echo Finished
+    exit
+  fi
+
 }
 
 function init {
@@ -127,7 +143,6 @@ function init {
     exit
     ;;
   esac
-
 }
 
 function parse_args {
@@ -177,7 +192,7 @@ function parse_args {
       shift
       ;;
     -p|--parallel)
-      if which parallel; then
+      if which parallel >/dev/null; then
         PARALLEL=true
       fi
       shift
@@ -206,6 +221,11 @@ function check_req {
 
   if ! which gs > /dev/null; then
     echo ghostscript missing!
+    exit
+  fi
+
+  if [ -z "$INPUT" ]; then
+    echo pdf input path is missing!
     exit
   fi
 }
@@ -269,8 +289,8 @@ Options:
                               full  
                             Default: full
                             note: it is assumed that required files are in the
-                            TMPDIR_PATH; 'full' and 'merge' delete intermediate
-                            files by default
+                            TMPDIR_PATH; modes 'split' and 'ocr' don't delete
+                            their output intermediate files
 
   -c, --tess-config         set the tesseract configuration; default: pdf
 
