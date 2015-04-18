@@ -16,8 +16,8 @@ Requirements:
   - tesseract
   - pdfunite
 
-  Optional:
-    parallel (speeds up ocr on multiple cores)
+Optional dependencies:
+  - parallel (speeds up ocr on multiple cores)
 
 Usage:
 
