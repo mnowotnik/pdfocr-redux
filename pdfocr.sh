@@ -1,7 +1,10 @@
 #! /bin/bash
 
 INPUT=
+declare -a INPUT_FILES
+ARGUMENTS=( "$@" )
 OUTPUT=
+OUT_FINAL=
 TESS_CONFIG=pdf
 TESS_LANG=eng
 RES=300
@@ -17,57 +20,46 @@ TMPDIR_PATH=~/tmp
 
 function pdfocr {
 
-  if [ $# -eq 0 ]; then
+  if [ ${#ARGUMENTS[@]} -eq 0 ]; then
     print_usage
     exit
   fi
 
-  parse_args $*
+  parse_args
 
   check_req
 
-  init
+  for input_file in "${INPUT_FILES[@]}"; do
+    echo Input file: $input_file
 
-  if [[ $MODE = @(full|split) ]];then
-    echo Running ghostscript on $INPUT
+    INPUT="$input_file"
 
-    gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
-      -o "$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT" -f "$INPUT" > /dev/null
+    init
 
-   try "Error while converting $INPUT"
-   exit_on_mode $MODE
-  fi
+    pdfocr_proc
 
-  if [[ $MODE = @(full|ocr) ]]; then
+    echo " "
 
-    local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
-    if [ $PARALLEL = true ]; then
-      echo Running tesseract on multiple cores
-      export -f run_tess
-      export TESS_PARAMS
-      export TESS_LANG
-      export TESS_CONFIG
-      parallel run_tess ::: $IN_P
-      try "Error while performing ocr"
-    else
-      for f in $IN_P; do
-        echo Running tesseract
-        run_tess "$f"
-        try "Error while performing ocr"
-        echo input $f 
-        echo output ${f%.*}_tess.pdf
-      done
-    fi
+  done
+
+  echo Finished
+
+}
+
+function pdfocr_proc {
+
+  split
+
+  ocr
+
+  merge
+
+  clean_tmp
 
 
-   exit_on_mode $MODE
-  fi
+}
 
-  if [[ $MODE = @(full|merge) ]]; then
-    echo merging into $OUTPUT
-    pdfunite "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf $OUTPUT 
-    try "Error while merging "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf into $OUTPUT"
-  fi
+function clean_tmp {
 
   if [ $KEEP_TMP = false ]; then
 
@@ -79,8 +71,62 @@ function pdfocr {
     fi
 
   fi
+}
 
-  echo Finished
+function split  {
+
+
+  if [[ $MODE = @(full|split) ]];then
+    echo Running ghostscript on $INPUT
+
+    gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
+      -o "$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT" -f "$INPUT" > /dev/null
+
+    try "Error while converting $INPUT"
+    exit_on_mode $MODE
+  fi
+
+}
+function ocr {
+
+  if [[ $MODE = @(full|ocr) ]]; then
+
+    local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+    if [ $PARALLEL = true ]; then
+      echo Running tesseract on multiple cores
+      export -f run_tess
+      export TESS_PARAMS
+      export TESS_LANG
+      export TESS_CONFIG
+      parallel run_tess ::: "$IN_P"*_gs.$IMG_FMT
+      try "Error while performing ocr"
+    else
+      for f in "$IN_P"*_gs.$IMG_FMT; do
+        echo Running tesseract
+        run_tess "$f"
+        try "Error while performing ocr"
+        echo input $f 
+        echo output ${f%.*}_tess.pdf
+      done
+    fi
+
+    exit_on_mode $MODE
+  fi
+
+
+}
+function merge {
+
+  if [[ $MODE = @(full|merge) ]]; then
+
+    local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+    local file_count=`ls -1 "$IN_P"*_gs_tess.pdf | wc -l`
+    if [[ $file_count -gt 1 ]]; then
+      echo merging into $OUT_FINAL
+      pdfunite "$IN_P"*_gs_tess.pdf "$OUT_FINAL"
+    fi
+    try "Error while merging $fn into $OUT_FINAL"
+  fi
 
 }
 
@@ -91,8 +137,7 @@ function run_tess {
 function exit_on_mode {
 
   if [[ $1 = @(split|ocr) ]];then
-    echo Finished
-    exit
+    continue
   fi
 
 }
@@ -109,8 +154,8 @@ function init {
 
   else
 
-    if [[ $OUTPUT =~ *INPUT_BASENAME* ]]; then
-      OUTPUT=${$OUTPUT/INPUT_BASENAME/$INPUT_BASENAME}
+    if [[ $OUTPUT =~ INPUT_BASENAME ]]; then
+      OUT_FINAL=${OUTPUT/INPUT_BASENAME/$INPUT_BASENAME}
     fi
 
     local OUTPUT_DIR=$(dirname $OUTPUT)
@@ -147,62 +192,67 @@ function init {
 
 function parse_args {
 
-  while [[ $# -gt 0 ]]; do
-    key="$1"
+  local let in_c=-1
+  local let v_c=0
 
+  while [[ $v_c -lt ${#ARGUMENTS[@]} ]]; do
+
+    key=${ARGUMENTS[$v_c]}
+    
+    if (( v_c < ${#ARGUMENTS[@]} ));then
+      local val="${ARGUMENTS[$((v_c+1))]}"
+    fi
     case $key in
+    -*)
+     let in_c=-1
+     ;;& 
     -i|--input)
-      INPUT="$2"
-      shift
+      let in_c=0
       ;;
     -o|--output)
-      OUTPUT="$2"
-      shift
+      OUTPUT="$val"
       ;;
     -t|--tempdir)
-      TMPDIR_PATH="$2"
-      shift
+      TMPDIR_PATH="$val"
       ;;
     -tess-config|-c)
-      TESS_CONFIG="$2"
-      shift
+      TESS_CONFIG="$val"
       ;;
     -l|--language)
-      TESS_LANG="$2"
-      shift
+      TESS_LANG="$val"
       ;;
     -r|--resolution)
-      RES="$2"
-      shift
+      RES="$val"
       ;;
     -f|--img-format)
-      GSDEV="$2"
-      shift
+      GSDEV="$val"
       ;;
     --tess-params)
-      TESS_PARAMS="$2"
-      shift
+      TESS_PARAMS="$val"
       ;;
     --keep-tmp)
       KEEP_TMP=true
-      shift
       ;;
     -m|--mode)
-      MODE="$2"
-      shift
+      MODE="$val"
       ;;
     -p|--parallel)
       if which parallel >/dev/null; then
         PARALLEL=true
       fi
-      shift
       ;;
     -h|--help)
       print_help
       exit
       ;;
+    *)
+      if (( in_c > -1 )); then
+        INPUT_FILES[$in_c]=$key
+        let in_c++
+      fi
+      ;;
     esac
-    shift
+    let v_c++
   done
 
 }
@@ -224,7 +274,7 @@ function check_req {
     exit
   fi
 
-  if [ -z "$INPUT" ]; then
+  if [ ${#INPUT_FILES[@]} -eq 0 ]; then
     echo pdf input path is missing!
     exit
   fi
@@ -345,6 +395,6 @@ END
 
 }
 
-pdfocr $*
+pdfocr
 
 # vim: ts=2 sw=2
