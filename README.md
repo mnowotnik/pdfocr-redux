@@ -2,9 +2,9 @@
 
 A convenience script that implements a pipeline for creating a searchable
 pdf file. The pipeline involves three parts:
-  -pdf splitting and conversion to images
-  -character recognition
-  -merging into the final pdf
+  - pdf splitting and conversion to images
+  - character recognition
+  - merging into the final pdf
 
 Each step can be performed separately of others. You can split pdf, preprocess
 images (e.g. with ImageMagick) and then perform ocr and merging.
@@ -12,9 +12,9 @@ images (e.g. with ImageMagick) and then perform ocr and merging.
 Requirements:
 
   The following software applications are required:
-  -gs (Ghostscript)
-  -tesseract
-  -pdfunite
+  - gs (Ghostscript)
+  - tesseract
+  - pdfunite
 
   Optional:
     parallel (speeds up ocr on multiple cores)
