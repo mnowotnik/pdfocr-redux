@@ -14,7 +14,7 @@ TESS_PARAMS=
 KEEP_TMP=false
 MODE=full
 PARALLEL=false
-JOBS=0
+JOBS=1
 GSDEV=jpeg
 INPUT_BASENAME=
 TMPDIR_PATH=~/tmp
@@ -103,15 +103,14 @@ function ocr {
       echo Running tesseract on multiple cores
       export -f run_tess
       export -f try
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG" ::: "$IN_P"*_gs.$IMG_FMT
+    else
+      for f in "$IN_P"*_gs.$IMG_FMT; do
+        if [ $PARALLEL = true ]; then
+          run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
+        fi
+      done
     fi
-    for f in "$IN_P"*_gs.$IMG_FMT; do
-      if [ $PARALLEL = true ]; then
-        echo file$f
-        parallel -n 4 -j $JOBS run_tess ::: "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
-      else
-        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
-      fi
-    done
 
     exit_on_mode $MODE
   fi
@@ -138,14 +137,14 @@ function preprocess {
   local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
   if [ $PARALLEL = true ]; then
     export -f run_preproc
+    parallel -n 1 -j $JOBS -m run_preproc "$PREPROCESSOR" {} ::: "$IN_P"*_gs.$IMG_FMT 
+  else
+    for f in "$IN_P"*_gs.$IMG_FMT; do
+      if [ $PARALLEL = true ]; then
+        run_preproc $f
+      fi
+    done
   fi
-  for f in "$IN_P"*_gs.$IMG_FMT; do
-    if [ $PARALLEL = true ]; then
-      parallel -n 2 -j $JOBS run_preproc ::: "$f" "$PREPROCESSOR"
-    else
-      run_preproc $f
-    fi
-  done
 
 }
 
@@ -161,8 +160,8 @@ function run_tess {
 }
 
 function run_preproc {
-      local PAGE_NUM=`echo $1|gawk 'match($0,/.+([0-9]{4})_gs.*/,arr) { print arr[1]}'`
-      "$2" "$1" $PAGE_NUM
+      local PAGE_NUM=`echo $2|gawk 'match($0,/.+([0-9]{4})_gs.*/,arr) { print arr[1]}'`
+      "$1" "$2" $PAGE_NUM
 }
 
 function exit_on_mode {
@@ -282,6 +281,8 @@ function parse_args {
         PARALLEL=true
         if [[ -n $val ]]; then
           JOBS=$val
+        else
+          JOBS=`parallel --number-of-cores`
         fi
       fi
       ;;
