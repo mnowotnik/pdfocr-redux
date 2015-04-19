@@ -417,7 +417,7 @@ Options:
                               jpeg png* ppm tiff*
                             any format supported by Ghostscript that matches
                             the above values is valid;
-                            notice: the image format makes a difference for
+                            note: the image format makes a difference for
                             tesseract, so experiment with different values
                             Default: jpeg
 
