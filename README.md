@@ -9,21 +9,21 @@ pdf file. The pipeline involves three parts:
 Each step can be performed separately of others. You can split pdf, preprocess
 images (e.g. with ImageMagick) and then perform ocr and merging.
 
-Requirements:
+## Requirements:
 
   The following software applications are required:
   - gs (Ghostscript)
   - tesseract
   - pdfunite
 
-Optional dependencies:
+ ### Optional dependencies:
   - parallel (speeds up ocr on multiple cores)
 
-Usage:
+## Usage:
 
     pdfocr -i|--input input.pdf [options...]
 
-Options:
+## Options:
 
     -l, --lang LANGS            set the language(s) for tesseract; check available
                                 languages with: 
