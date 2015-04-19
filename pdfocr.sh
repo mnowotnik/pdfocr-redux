@@ -103,7 +103,8 @@ function ocr {
       echo Running tesseract on multiple cores
       export -f run_tess
       export -f try
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG" ::: "$IN_P"*_gs.$IMG_FMT
+      local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" ::: "$IN_P"*_gs.$IMG_FMT
     else
       for f in "$IN_P"*_gs.$IMG_FMT; do
         if [ $PARALLEL = true ]; then
