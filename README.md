@@ -18,7 +18,7 @@ images (e.g. with ImageMagick) and then perform ocr and merging.
   - pdfunite
 
 #### Optional dependencies:
-  - parallel (speeds up ocr on multiple cores)
+  - parallel (speeds up ocr and preprocessing on multiple cores)
 
 ## Usage:
 
