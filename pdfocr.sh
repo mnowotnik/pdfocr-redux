@@ -137,12 +137,11 @@ function preprocess {
   local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
   if [ $PARALLEL = true ]; then
     export -f run_preproc
-    parallel -n 1 -j $JOBS -m run_preproc "$PREPROCESSOR" {} ::: "$IN_P"*_gs.$IMG_FMT 
+    local PRE4PARA=`parallel --shellquote ::: "$PREPROCESSOR"`
+    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: "$IN_P"*_gs.$IMG_FMT 
   else
     for f in "$IN_P"*_gs.$IMG_FMT; do
-      if [ $PARALLEL = true ]; then
-        run_preproc $f
-      fi
+        run_preproc "$PREPROCESSOR" $f
     done
   fi
 
@@ -161,7 +160,7 @@ function run_tess {
 
 function run_preproc {
       local PAGE_NUM=`echo $2|gawk 'match($0,/.+([0-9]{4})_gs.*/,arr) { print arr[1]}'`
-      "$1" "$2" $PAGE_NUM
+      $1 "$2" $PAGE_NUM
 }
 
 function exit_on_mode {
