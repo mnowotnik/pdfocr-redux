@@ -3,6 +3,7 @@
 A convenience script that implements a pipeline for creating a searchable
 pdf file. The pipeline involves three parts:
   - pdf splitting and conversion to images
+  - user-defined image preprocessing
   - character recognition
   - merging into the final pdf
 
@@ -16,7 +17,7 @@ images (e.g. with ImageMagick) and then perform ocr and merging.
   - tesseract
   - pdfunite
 
- ### Optional dependencies:
+#### Optional dependencies:
   - parallel (speeds up ocr on multiple cores)
 
 ## Usage:
