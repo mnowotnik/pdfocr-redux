@@ -21,53 +21,60 @@ Optional dependencies:
 
 Usage:
 
-       pdfocr -i|--input input.pdf [options...]
+    pdfocr -i|--input input.pdf [options...]
 
 Options:
 
-      -l, --lang "LANG"     set the language(s) for tesseract; check available
-                            languages with: tesseract --list-langs; put multiple
-                            languages inside double quotes
+    -l, --lang LANGS            set the language(s) for tesseract; check available
+                                languages with: 
+                                    tesseract --list-langs
 
-      -o, --output OUTPUT_PATH  set the output path; it can be explicit or use the
-                            INPUT_BASENAME variable to construct it dynamically
-                            e.g. , -o INPUT_BASENAME_ocr.pdf
-                            Default: INPUT_BASENAME_ocr.pdf
+    -o, --output OUTPUT_PATH  set the output path; it can be explicit or use the
+                                INPUT_BASENAME variable to construct it dynamically
+                                e.g. , -o INPUT_BASENAME_ocr.pdf
+                                Default: INPUT_BASENAME_ocr.pdf
 
-      -t, --tempdir TMPDIR_PATH set the path to directory with intermediate
-                            files; Default: ~/tmp
+    -t, --tempdir TMPDIR_PATH set the path to directory with intermediate
+                                files; Default: ~/tmp
 
-      -m, --mode MODE       set the mode to perform only the part of processing;
-                            MODE can be one of: 
-                              split
-                              ocr
-                              merge
-                              full  
-                            Default: full
-                            note: it is assumed that required files are in the
-                            TMPDIR_PATH; modes 'split' and 'ocr' don't delete
-                            their output intermediate files
+    -s, --preprocessor PROC_PATH set the path to an image preprocessor;
+                                the preprocessor shall be executed for the image of
+                                each page like this:
+                                    preprocessor img_path page_num
+                                the preprocessor should overwrite the original image
 
-      -c, --tess-config     set the tesseract configuration; default: pdf
+    -m, --mode MODE           set the mode to perform only the part of processing;
+                                MODE can be one of: 
+                                split
+                                ocr
+                                merge
+                                full  
+                                Default: full
+                                note: it is assumed that required files are in the
+                                TMPDIR_PATH; modes 'split' and 'ocr' don't delete
+                                their output intermediate files
 
-          --keep-tmp        keep the intermediate files; deleted by default
+    -c, --tess-config         set the tesseract configuration; default: pdf
 
-      -f, --img-format      the format of the intermediate images; 
-                            possible values:
-                              jpeg png* ppm tiff*
-                            any format supported by Ghostscript that matches
-                            the above values is valid;
-                            notice: the image format makes a difference for
-                            tesseract, so experiment with different values
-                            Default: jpeg
+    -p, --parallel [JOBS]     use GNU parallel if available; limit the number
+                                of jobs to JOBS
 
-      -r, --resolution      set the resolution of the intermediate images;
-                            default: 300
+        --keep-tmp            keep the intermediate files; deleted by default
 
-          --tess-params     set the tesseract parameters; those should be inside
-                            double quotes e.g., "-c textord_min_linesize=2.5"
+    -f, --img-format          the format of the intermediate images; 
+                                possible values:
+                                jpeg png* ppm tiff*
+                                any format supported by Ghostscript that matches
+                                the above values is valid;
+                                notice: the image format makes a difference for
+                                tesseract, so experiment with different values
+                                Default: jpeg
 
-      -h, --help            print this
+    -r, --resolution          set the resolution of the intermediate images;
+                                default: 300
 
-      -p, --parallel        use GNU parallel if available
+        --tess-params         set the tesseract parameters; those should be inside
+                                double quotes e.g., "-c textord_min_linesize=2.5"
+
+    -h, --help                print this
 

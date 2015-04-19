@@ -14,6 +14,7 @@ TESS_PARAMS=
 KEEP_TMP=false
 MODE=full
 PARALLEL=false
+JOBS=0
 GSDEV=jpeg
 INPUT_BASENAME=
 TMPDIR_PATH=~/tmp
@@ -63,11 +64,11 @@ function clean_tmp {
 
   if [ $KEEP_TMP = false ]; then
 
-    if [ $MODE != split ]; then
-      rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
+    if [[ $MODE != split ]]; then
+      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
     fi
-    if [ $MODE != ocr ]; then
-      rm "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
+    if [[ $MODE != ocr ]]; then
+      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
     fi
 
   fi
@@ -77,14 +78,20 @@ function split  {
 
 
   if [[ $MODE = @(full|split) ]];then
-    echo Running ghostscript on $INPUT
+    echo Running ghostscript
 
+    local GS_OUT="$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT"
     gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
-      -o "$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT" -f "$INPUT" > /dev/null
+      -o "$GS_OUT" -f "$INPUT" > /dev/null
 
     try "Error while converting $INPUT"
-    exit_on_mode $MODE
   fi
+
+  if [[ -n $PREPROCESSOR ]]; then
+    preprocess
+  fi
+
+  exit_on_mode $MODE
 
 }
 function ocr {
@@ -95,20 +102,16 @@ function ocr {
     if [ $PARALLEL = true ]; then
       echo Running tesseract on multiple cores
       export -f run_tess
-      export TESS_PARAMS
-      export TESS_LANG
-      export TESS_CONFIG
-      parallel run_tess ::: "$IN_P"*_gs.$IMG_FMT
-      try "Error while performing ocr"
-    else
-      for f in "$IN_P"*_gs.$IMG_FMT; do
-        echo Running tesseract
-        run_tess "$f"
-        try "Error while performing ocr"
-        echo input $f 
-        echo output ${f%.*}_tess.pdf
-      done
+      export -f try
     fi
+    for f in "$IN_P"*_gs.$IMG_FMT; do
+      if [ $PARALLEL = true ]; then
+        echo file$f
+        parallel -n 4 -j $JOBS run_tess ::: "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
+      else
+        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
+      fi
+    done
 
     exit_on_mode $MODE
   fi
@@ -130,8 +133,36 @@ function merge {
 
 }
 
+function preprocess {
+
+  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+  if [ $PARALLEL = true ]; then
+    export -f run_preproc
+  fi
+  for f in "$IN_P"*_gs.$IMG_FMT; do
+    if [ $PARALLEL = true ]; then
+      parallel -n 2 -j $JOBS run_preproc ::: "$f" "$PREPROCESSOR"
+    else
+      run_preproc $f
+    fi
+  done
+
+}
+
 function run_tess {
-    tesseract "$1" "${1%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG
+  local IN=$1
+  local TESS_LANG=$2
+  local TESS_PARAMS=$3
+  local TESS_CONFIG=$4
+  tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG
+  try "Error while performing ocr"
+  echo input $1 
+  echo output ${1%.*}_tess.pdf
+}
+
+function run_preproc {
+      local PAGE_NUM=`echo $1|gawk 'match($0,/.+([0-9]{4})_gs.*/,arr) { print arr[1]}'`
+      "$2" "$1" $PAGE_NUM
 }
 
 function exit_on_mode {
@@ -150,12 +181,14 @@ function init {
   if [ -z "$OUTPUT" ]; then
 
     local INPUT_DIR=$(dirname "$INPUT")
-    OUTPUT="$INPUT_DIR/$INPUT_BASENAME"_ocr.pdf
+    OUT_FINAL="$INPUT_DIR/$INPUT_BASENAME"_ocr.pdf
 
   else
 
     if [[ $OUTPUT =~ INPUT_BASENAME ]]; then
       OUT_FINAL=${OUTPUT/INPUT_BASENAME/$INPUT_BASENAME}
+    else
+      OUT_FINAL=$OUTPUT
     fi
 
     local OUTPUT_DIR=$(dirname $OUTPUT)
@@ -192,8 +225,11 @@ function init {
 
 function parse_args {
 
-  local let in_c=-1
+  local let in_c=0
   local let v_c=0
+
+  local LANGS_ARR=()
+  local IN_ARG=
 
   while [[ $v_c -lt ${#ARGUMENTS[@]} ]]; do
 
@@ -201,13 +237,18 @@ function parse_args {
     
     if (( v_c < ${#ARGUMENTS[@]} ));then
       local val="${ARGUMENTS[$((v_c+1))]}"
+      if [[ $val == -* ]]; then
+        val=
+      fi
+
     fi
     case $key in
     -*)
-     let in_c=-1
+      IN_ARG=
+      let in_c=0
      ;;& 
     -i|--input)
-      let in_c=0
+      IN_ARG=INPUT
       ;;
     -o|--output)
       OUTPUT="$val"
@@ -219,7 +260,7 @@ function parse_args {
       TESS_CONFIG="$val"
       ;;
     -l|--language)
-      TESS_LANG="$val"
+      IN_ARG=TESS_LANG
       ;;
     -r|--resolution)
       RES="$val"
@@ -239,21 +280,37 @@ function parse_args {
     -p|--parallel)
       if which parallel >/dev/null; then
         PARALLEL=true
+        if [[ -n $val ]]; then
+          JOBS=$val
+        fi
       fi
+      ;;
+    -s|--preprocessor)
+      PREPROCESSOR=$val
       ;;
     -h|--help)
       print_help
       exit
       ;;
     *)
-      if (( in_c > -1 )); then
+      case $IN_ARG in
+      INPUT)
         INPUT_FILES[$in_c]=$key
         let in_c++
-      fi
+        ;;
+      TESS_LANG)
+        LANGS_ARR[$in_c]=$key
+        let in_c++
+      esac
       ;;
     esac
     let v_c++
   done
+
+  if [[ ${#LANGS_ARR} -gt 0 ]]; then
+    TESS_LANG="${LANGS_ARR[@]}"
+    TESS_LANG=`echo "$TESS_LANG"|sed 's/ /+/'`
+  fi
 
 }
 
@@ -282,7 +339,7 @@ function check_req {
 
 function try {
 
-  if [ $? -ne 0 ] ; then
+  if [[ $? -ne 0 ]] ; then
     echo $1
     exit
   fi
@@ -319,9 +376,9 @@ Usage:
 
 Options:
 
-  -l, --lang "LANG"         set the language(s) for tesseract; check available
-                            languages with: tesseract --list-langs; put multiple
-                            languages inside double quotes
+-l, --lang LANGS            set the language(s) for tesseract; check available
+                            languages with: 
+                                tesseract --list-langs
 
   -o, --output OUTPUT_PATH  set the output path; it can be explicit or use the
                             INPUT_BASENAME variable to construct it dynamically
@@ -330,6 +387,12 @@ Options:
 
   -t, --tempdir TMPDIR_PATH set the path to directory with intermediate
                             files; Default: ~/tmp
+
+  -s, --preprocessor PROC_PATH set the path to an image preprocessor;
+                            the preprocessor shall be executed for the image of
+                            each page like this:
+                                preprocessor img_path page_num
+                            the preprocessor should overwrite the original image
 
   -m, --mode MODE           set the mode to perform only the part of processing;
                             MODE can be one of: 
@@ -343,6 +406,9 @@ Options:
                             their output intermediate files
 
   -c, --tess-config         set the tesseract configuration; default: pdf
+
+  -p, --parallel [JOBS]     use GNU parallel if available; limit the number
+                            of jobs to JOBS
 
       --keep-tmp            keep the intermediate files; deleted by default
 
@@ -363,7 +429,6 @@ Options:
 
   -h, --help                print this
 
-  -p, --parallel            use GNU parallel if available
 
 END
 }
@@ -379,7 +444,7 @@ Usage:
 Options:
 
   -h, --help                print help
-  -l, --lang "LANG"         set the language(s) for tesseract
+  -l, --lang LANGS         set the language(s) for tesseract
   -o, --output OUTPUT_PATH  set the output path
   -t, --tempdir TMPDIR_PATH set the path to tempdir (def: ~/tmp)
   -m, --mode MODE           set the mode (split,ocr,merge,full)
@@ -389,7 +454,8 @@ Options:
   -r, --resolution NUM      set the resolution of the intermediate images
       --tess-params "PARAMS"  set the tesseract parameters
       --keep-tmp            keep the intermediate files; deleted by default
-  -p, --parallel            use GNU parallel if available
+  -p, --parallel [JOBS]     use GNU parallel if available
+  -s, --preprocessor PROC_PATH set the path to images preprocessor
 
 END
 
