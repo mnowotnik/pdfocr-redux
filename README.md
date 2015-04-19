@@ -31,9 +31,9 @@ images (e.g. with ImageMagick) and then perform ocr and merging.
                                   tesseract --list-langs
 
     -o, --output OUTPUT_PATH  set the output path; it can be explicit or use the
-                                  INPUT_BASENAME variable to construct it dynamically
-                                  e.g. , -o INPUT_BASENAME_ocr.pdf
-                                  Default: INPUT_BASENAME_ocr.pdf
+                              INPUT_BASENAME variable to construct it dynamically
+                              e.g. , -o INPUT_BASENAME_ocr.pdf
+                              Default: INPUT_BASENAME_ocr.pdf
 
     -t, --tempdir TMPDIR_PATH set the path to directory with intermediate
                                   files; Default: ~/tmp
