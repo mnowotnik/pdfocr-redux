@@ -18,6 +18,13 @@ JOBS=1
 GSDEV=jpeg
 INPUT_BASENAME=
 TMPDIR_PATH=~/tmp
+VERBOSE=false
+
+#regexes
+shopt -s extglob
+
+#kill child processes on error
+trap 'end_jobs' EXIT
 
 function pdfocr {
 
@@ -31,7 +38,11 @@ function pdfocr {
   check_req
 
   for input_file in "${INPUT_FILES[@]}"; do
-    echo Input file: $input_file
+    echo Input file: `basename "$input_file"`
+
+    if [[ $MODE = clean ]]; then
+      echo Cleaning temp files...
+    fi
 
     INPUT="$input_file"
 
@@ -101,16 +112,25 @@ function ocr {
     local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
     if [ $PARALLEL = true ]; then
       echo Running tesseract on multiple cores
+      if [ $VERBOSE = false ];then
+        run_wait
+      fi
       export -f run_tess
       export -f try
+
       local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" ::: "$IN_P"*_gs.$IMG_FMT
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: "$IN_P"*_gs.$IMG_FMT
+      try "Error while running parallel tesseract jobs!"
+      kill -INT $!
     else
+      echo Running tesseract on a single core
+      if [ $VERBOSE = false ];then
+        run_wait
+      fi
       for f in "$IN_P"*_gs.$IMG_FMT; do
-        if [ $PARALLEL = true ]; then
-          run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
-        fi
+        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
       done
+      kill -INT $!
     fi
 
     exit_on_mode $MODE
@@ -125,7 +145,7 @@ function merge {
     local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
     local file_count=`ls -1 "$IN_P"*_gs_tess.pdf | wc -l`
     if [[ $file_count -gt 1 ]]; then
-      echo merging into $OUT_FINAL
+      echo Merging into $OUT_FINAL
       pdfunite "$IN_P"*_gs_tess.pdf "$OUT_FINAL"
     fi
     try "Error while merging $fn into $OUT_FINAL"
@@ -148,15 +168,27 @@ function preprocess {
 
 }
 
+function run_wait {
+
+  export -f wait_anim
+  wait_anim &
+
+}
 function run_tess {
   local IN=$1
   local TESS_LANG=$2
   local TESS_PARAMS=$3
   local TESS_CONFIG=$4
-  tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG
-  try "Error while performing ocr"
-  echo input $1 
-  echo output ${1%.*}_tess.pdf
+  local VERBOSE=$5
+  local tess_o=
+  tess_o=$(tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG   2>&1)
+  try "Error while performing ocr!" "$tess_o"
+
+  if [ verbose = true ]; then
+    echo $tess_o
+    echo Tesseract input $1 
+    echo Tesseract output ${1%.*}_tess.pdf
+  fi
 }
 
 function run_preproc {
@@ -184,13 +216,19 @@ function init {
 
   else
 
-    if [[ $OUTPUT =~ INPUT_BASENAME ]]; then
-      OUT_FINAL=${OUTPUT/INPUT_BASENAME/$INPUT_BASENAME}
+    if [[ "$OUTPUT" =~ INPUT_BASENAME ]]; then
+      OUT_FINAL="${OUTPUT/INPUT_BASENAME/$INPUT_BASENAME}"
+    elif [[ "${OUTPUT: -1}" == "/" ]]; then
+      OUT_FINAL="$OUTPUT$INPUT_BASENAME"_ocr.pdf
+      OUTPUT_DIR=$OUTPUT
     else
       OUT_FINAL=$OUTPUT
     fi
 
-    local OUTPUT_DIR=$(dirname $OUTPUT)
+    if [ -z $OUTPUT_DIR ]; then
+      local OUTPUT_DIR=$(dirname $OUTPUT)
+    fi
+
     if [ ! -d "$OUTPUT_DIR" ]; then
       mkdir -p "$OUTPUT_DIR"
       try "Failed creating the output directory: $OUTPUT_DIR"
@@ -289,6 +327,9 @@ function parse_args {
     -s|--preprocessor)
       PREPROCESSOR=$val
       ;;
+    -v|--verbose)
+      VERBOSE=true
+      ;;
     -h|--help)
       print_help
       exit
@@ -311,6 +352,12 @@ function parse_args {
   if [[ ${#LANGS_ARR} -gt 0 ]]; then
     TESS_LANG="${LANGS_ARR[@]}"
     TESS_LANG=`echo "$TESS_LANG"|sed 's/ /+/'`
+  fi
+
+  if ! [[ $MODE = @(split|full|ocr|merge|clean) ]];then
+    echo "Invalid mode: $MODE"
+    print_usage
+    exit
   fi
 
 }
@@ -341,9 +388,13 @@ function check_req {
 function try {
 
   if [[ $? -ne 0 ]] ; then
-    echo $1
-    exit
+    for msg; do
+      echo $msg
+    done
+    echo
+    exit 1
   fi
+  return 0
 }
 
 function print_help {
@@ -411,6 +462,8 @@ Options:
   -p, --parallel [JOBS]     use GNU parallel if available; limit the number
                             of jobs to JOBS
 
+  -v, --verbose             allow verbose output
+
       --keep-tmp            keep the intermediate files; deleted by default
 
   -f, --img-format          the format of the intermediate images; 
@@ -456,9 +509,60 @@ Options:
       --tess-params "PARAMS"  set the tesseract parameters
       --keep-tmp            keep the intermediate files; deleted by default
   -p, --parallel [JOBS]     use GNU parallel if available
+  -v, --verbose             allow verbose output
   -s, --preprocessor PROC_PATH set the path to images preprocessor
 
 END
+
+}
+
+function wait_anim {
+
+  trap "__STOP_PRINT=true" SIGINT
+  local move=r
+  local let length=5
+  local let pos=0
+  while [[ $__STOP_PRINT != true ]]; do
+
+    echo -n " |"
+
+    for ((i=0;i<pos;i++));do
+      echo -n " "
+    done
+
+    echo -n "*"
+
+    for ((i=0;i<length-pos;i++));do
+      echo -n " "
+    done
+
+    echo -n "|"
+    echo -ne \\r
+
+
+    if [[ $move == r ]]; then
+      let pos++
+      if ((pos>=length)); then
+        move=l
+      fi
+    else
+      let pos--
+      if ((pos<=0)); then
+        move=r
+      fi
+    fi
+
+    sleep 0.07
+  done
+  echo -n 
+}
+
+function end_jobs {
+
+  local job_n=`jobs -p | wc -l`
+  if ((job_n>0)); then
+    jobs -p | xargs kill
+  fi
 
 }
 
