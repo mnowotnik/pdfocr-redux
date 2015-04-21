@@ -20,6 +20,12 @@ INPUT_BASENAME=
 TMPDIR_PATH=~/tmp
 VERBOSE=false
 
+RESET="\e[0m"
+PENDING="\e[1;91m"
+ERROR="\e[1;31m"
+DONE="\e[1;36m"
+MSG="\e[1;36m"
+
 #regexes
 shopt -s extglob
 
@@ -38,69 +44,84 @@ function pdfocr {
   check_req
 
   for input_file in "${INPUT_FILES[@]}"; do
-    echo Input file: `basename "$input_file"`
+    echo -e "${MSG}Input file:$RESET" `basename "$input_file"`
 
     if [[ $MODE = clean ]]; then
       echo Cleaning temp files...
     fi
 
-    INPUT="$input_file"
+    check_file $input_file
 
-    init
+    init "$input_file"
 
-    pdfocr_proc
+    pdfocr_proc "$input_file"
 
-    echo " "
+    echo
 
   done
 
-  echo Finished
+  echo -e "${DONE}Finished$RESET"
 
 }
 
 function pdfocr_proc {
 
-  split
+  local input_file=$1
 
-  ocr
+  split $input_file
 
-  merge
+  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
 
-  clean_tmp
+  if [[ -n $PREPROCESSOR ]]; then
+    preprocess "$IN_P"*_gs.$IMG_FMT
+  fi
+
+  ocr "$IN_P"*_gs.$IMG_FMT
+
+  merge "$IN_P"*_gs_tess.pdf
+
+  local rm_files=
+
+  if [[ $MODE != split ]]; then
+    rm_files="$IN_P"*_gs.$IMG_FMT
+  fi
+  if [[ $MODE != ocr ]]; then
+    rm_files=$rm_files" $IN_P"*_gs_tess.$IMG_FMT
+  fi
+
+  clean_tmp $rm_files
 
 
 }
 
 function split  {
 
-
   if [[ $MODE = @(full|split) ]];then
-    echo Running ghostscript
+    echo -e ${PENDING}Running$RESET ghostscript
+
+    local IN_F=$1
 
     local GS_OUT="$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT"
     gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
-      -o "$GS_OUT" -f "$INPUT" > /dev/null
+      -o "$GS_OUT" -f "$IN_F" > /dev/null
 
-    try "Error while converting $INPUT"
+    try "Error while converting $IN_F"
+
   fi
-
-  if [[ -n $PREPROCESSOR ]]; then
-    preprocess
-  fi
-
-  exit_on_mode $MODE
-
 }
 
 function preprocess {
 
-  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
   if [ $PARALLEL = true ]; then
+    echo -e ${PENDING}Running$RESET preprocessor in parallel
     export -f run_preproc
+    export -f try
     local PRE4PARA=`parallel --shellquote ::: "$PREPROCESSOR"`
-    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: "$IN_P"*_gs.$IMG_FMT 
+    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: $* 
+    try "Error during parallel preprocessing!"
   else
-    for f in "$IN_P"*_gs.$IMG_FMT; do
+    echo -e ${PENDING}Running$RESET preprocessor
+    for f ;do
         run_preproc "$PREPROCESSOR" $f
     done
   fi
@@ -113,29 +134,29 @@ function ocr {
 
     local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
     if [ $PARALLEL = true ]; then
-      echo Running tesseract on multiple cores
+      echo -e ${PENDING}Running$RESET tesseract in parallel
       if [ $VERBOSE = false ];then
         run_wait
       fi
+
       export -f run_tess
       export -f try
 
       local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: "$IN_P"*_gs.$IMG_FMT
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: $*
       try "Error while running parallel tesseract jobs!"
       kill -INT $!
     else
-      echo Running tesseract on a single core
+      echo -e ${PENDING}Running$RESET tesseract
       if [ $VERBOSE = false ];then
         run_wait
       fi
-      for f in "$IN_P"*_gs.$IMG_FMT; do
+      for f; do
         run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
       done
       kill -INT $!
     fi
 
-    exit_on_mode $MODE
   fi
 
 
@@ -147,11 +168,13 @@ function merge {
 
     local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
     local file_count=`ls -1 "$IN_P"*_gs_tess.pdf | wc -l`
+    echo -e ${PENDING}Merging$RESET into $OUT_FINAL
     if [[ $file_count -gt 1 ]]; then
-      echo Merging into $OUT_FINAL
-      pdfunite "$IN_P"*_gs_tess.pdf "$OUT_FINAL"
+      pdfunite $* "$OUT_FINAL"
+    else
+      cp "$*" "$OUT_FINAL"
     fi
-    try "Error while merging $fn into $OUT_FINAL"
+    try "Error while merging $* into $OUT_FINAL"
   fi
 
 }
@@ -160,12 +183,7 @@ function clean_tmp {
 
   if [ $KEEP_TMP = false ]; then
 
-    if [[ $MODE != split ]]; then
-      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
-    fi
-    if [[ $MODE != ocr ]]; then
-      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
-    fi
+    rm -f $*
 
   fi
 }
@@ -198,6 +216,7 @@ function run_tess {
 function run_preproc {
       local PAGE_NUM=`echo $2|gawk 'match($0,/.+([0-9]{4})_gs.*/,arr) { print arr[1]}'`
       $1 "$2" $PAGE_NUM
+      try "Error while preprocessing!" "Preprocessor: $1" "Input file: $2"
 }
 
 function exit_on_mode {
@@ -209,6 +228,8 @@ function exit_on_mode {
 }
 
 function init {
+
+  local INPUT=$1
 
   INPUT_BASENAME=$(basename "$INPUT")
   INPUT_BASENAME=${INPUT_BASENAME%.*}
@@ -242,7 +263,7 @@ function init {
 
   if [ ! -d "TMPDIR_PATH" ]; then
     mkdir -p "$TMPDIR_PATH"
-    try "Failed creating the temporaroy directory: $TMPDIR_PATH"
+    try "Failed creating the temporary directory: $TMPDIR_PATH"
   fi
 
   case $GSDEV in
@@ -389,16 +410,34 @@ function check_req {
   fi
 }
 
+function check_file {
+
+  if ! [ -f $1 ]; then
+    throw "No such file: $1"
+  fi
+
+}
+
 function try {
 
   if [[ $? -ne 0 ]] ; then
-    for msg; do
-      echo $msg
-    done
-    echo
+    print_errors "$@"
     exit 1
   fi
   return 0
+}
+ 
+function throw {
+
+  print_errors "$@"
+  exit 1
+}
+
+function print_errors {
+
+  for msg; do
+    echo -e "$ERROR$msg$RESET"
+  done
 }
 
 function print_help {
@@ -528,19 +567,19 @@ function wait_anim {
   local let pos=0
   while [[ $__STOP_PRINT != true ]]; do
 
-    echo -n " |"
+    echo -en " |"
 
     for ((i=0;i<pos;i++));do
       echo -n " "
     done
 
-    echo -n "*"
+    echo -en "$PENDING*$RESET"
 
     for ((i=0;i<length-pos;i++));do
       echo -n " "
     done
 
-    echo -n "|"
+    echo -en "|"
     echo -ne \\r
 
 
@@ -558,7 +597,6 @@ function wait_anim {
 
     sleep 0.07
   done
-  echo -n 
 }
 
 function end_jobs {
@@ -571,5 +609,6 @@ function end_jobs {
 }
 
 pdfocr
+trap '' EXIT SIGINT
 
 # vim: ts=2 sw=2
