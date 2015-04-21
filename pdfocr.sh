@@ -86,7 +86,7 @@ function pdfocr_proc {
     rm_files="$IN_P"*_gs.$IMG_FMT
   fi
   if [[ $MODE != ocr ]]; then
-    rm_files=$rm_files" $IN_P"*_gs_tess.$IMG_FMT
+    rm_files=$rm_files" $IN_P"*_gs_tess.pdf
   fi
 
   clean_tmp $rm_files
