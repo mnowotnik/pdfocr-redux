@@ -10,7 +10,7 @@ pdf file. The pipeline involves three parts:
 Each step can be performed separately of others. You can split pdf, preprocess
 images (e.g. with ImageMagick) and then perform ocr and merging.
 
-## Usage:
+## Usage
 
     pdfocr -i input.pdf [options...]
 
@@ -25,14 +25,14 @@ modify the script and add new stages. Just check the [source](pdfocr.sh).
 Moreover, with the optional preprocessor component, it can be used as
 all-around ocr script, not just for creating searchable pdfs.
 
-## Requirements:
+## Requirements
 
   The following software applications are required:
   - gs (Ghostscript)
   - tesseract
   - pdfunite
 
-#### Optional dependencies:
+#### Optional dependencies
   - parallel (speeds up ocr and preprocessing on multiple cores)
 
 
