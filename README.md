@@ -1,6 +1,10 @@
-# pdfocr.sh
+# PDFOCR-Redux
 
-A convenience script that implements a pipeline for creating a searchable
+Your normal pdfocr bash script revisited! All the flexibility and speed is
+already here. Not to mention new handy features to blow your socks off. 
+Tune in to your ultimate pdfocr source.
+
+PDFOCR implements a pipeline for creating a searchable
 pdf file. The pipeline involves three parts:
   - pdf splitting and conversion to images
   - user-defined image preprocessing
@@ -23,7 +27,7 @@ This pipeline tries to be as transparent as possible so it's very easy to
 modify the script and add new stages. Just check the [source](pdfocr.sh).
 
 Moreover, with the optional preprocessor component, it can be used as
-all-around ocr script, not just for creating searchable pdfs.
+all-purpose ocr script, not just for creating searchable pdfs.
 
 ## Requirements
 
