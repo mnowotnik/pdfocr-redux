@@ -120,5 +120,5 @@ all-purpose ocr script, not just for creating searchable pdfs.
                                 inside double quotes e.g., 
                                 "-c textord_min_linesize=2.5"
 
-    -h, --help                print this
+    -h, --help                  print this
     
