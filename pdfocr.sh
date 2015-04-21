@@ -71,20 +71,6 @@ function pdfocr_proc {
 
 }
 
-function clean_tmp {
-
-  if [ $KEEP_TMP = false ]; then
-
-    if [[ $MODE != split ]]; then
-      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
-    fi
-    if [[ $MODE != ocr ]]; then
-      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
-    fi
-
-  fi
-}
-
 function split  {
 
 
@@ -105,6 +91,22 @@ function split  {
   exit_on_mode $MODE
 
 }
+
+function preprocess {
+
+  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+  if [ $PARALLEL = true ]; then
+    export -f run_preproc
+    local PRE4PARA=`parallel --shellquote ::: "$PREPROCESSOR"`
+    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: "$IN_P"*_gs.$IMG_FMT 
+  else
+    for f in "$IN_P"*_gs.$IMG_FMT; do
+        run_preproc "$PREPROCESSOR" $f
+    done
+  fi
+
+}
+
 function ocr {
 
   if [[ $MODE = @(full|ocr) ]]; then
@@ -138,6 +140,7 @@ function ocr {
 
 
 }
+
 function merge {
 
   if [[ $MODE = @(full|merge) ]]; then
@@ -153,20 +156,20 @@ function merge {
 
 }
 
-function preprocess {
+function clean_tmp {
 
-  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
-  if [ $PARALLEL = true ]; then
-    export -f run_preproc
-    local PRE4PARA=`parallel --shellquote ::: "$PREPROCESSOR"`
-    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: "$IN_P"*_gs.$IMG_FMT 
-  else
-    for f in "$IN_P"*_gs.$IMG_FMT; do
-        run_preproc "$PREPROCESSOR" $f
-    done
+  if [ $KEEP_TMP = false ]; then
+
+    if [[ $MODE != split ]]; then
+      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs.$IMG_FMT
+    fi
+    if [[ $MODE != ocr ]]; then
+      rm -f "$TMPDIR_PATH/$INPUT_BASENAME"*_gs_tess.pdf
+    fi
+
   fi
-
 }
+
 
 function run_wait {
 
@@ -174,6 +177,7 @@ function run_wait {
   wait_anim &
 
 }
+
 function run_tess {
   local IN=$1
   local TESS_LANG=$2
