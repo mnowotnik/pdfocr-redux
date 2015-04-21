@@ -1,4 +1,5 @@
 # PDFOCR-Redux
+![zoom](img/magni-glass.png)
 
 Your normal pdfocr bash script revisited! All the flexibility and speed is
 already here. Not to mention new handy features to blow your socks off. 
