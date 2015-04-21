@@ -20,7 +20,7 @@ Available pdfocr scripts are neat, but I needed speed and flexiblity in
 dealing with tessaract. So I decided to roll my own. 
 
 This pipeline tries to be as transparent as possible so it's very easy to
-modify the script and add new stages. Just check the source.
+modify the script and add new stages. Just check the [source](pdfocr.sh).
 
 Moreover, with the optional preprocessor component, it can be used as
 all-around ocr script, not just for creating searchable pdfs.
