@@ -76,8 +76,7 @@ all-purpose ocr script, not just for creating searchable pdfs.
 
     -s, --preprocessor PROC_PATH set the path to an image preprocessor;
                                 the preprocessor shall be executed for the
-                                image of
-                                each page like this:
+                                image of each page like this:
                                     preprocessor img_path page_num
                                 the preprocessor should overwrite the original
                                 image
