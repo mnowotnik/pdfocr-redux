@@ -518,7 +518,7 @@ Options:
                             tesseract, so experiment with different values
                             Default: jpeg
 
-  -r, --resolution          set the resolution of the intermediate images;
+  -r, --resolution  RES     set the resolution of intermediate images to RES;
                             default: 300
 
       --tess-params         set the tesseract parameters; those should be inside
