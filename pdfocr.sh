@@ -50,7 +50,7 @@ function pdfocr {
       echo Cleaning temp files...
     fi
 
-    check_file $input_file
+    check_file "$input_file"
 
     init "$input_file"
 
@@ -68,28 +68,19 @@ function pdfocr_proc {
 
   local input_file=$1
 
-  split $input_file
+  split "$input_file"
 
   local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
 
   if [[ -n $PREPROCESSOR ]]; then
-    preprocess "$IN_P"*_gs.$IMG_FMT
+    preprocess "$IN_P" "$IMG_FMT"
   fi
 
-  ocr "$IN_P"*_gs.$IMG_FMT
+  ocr "$IN_P" "$IMG_FMT"
 
-  merge "$IN_P"*_gs_tess.pdf
+  merge "$IN_P"
 
-  local rm_files=
-
-  if [[ $MODE != split ]]; then
-    rm_files="$IN_P"*_gs.$IMG_FMT
-  fi
-  if [[ $MODE != ocr ]]; then
-    rm_files=$rm_files" $IN_P"*_gs_tess.pdf
-  fi
-
-  clean_tmp $rm_files
+  clean_tmp "$IN_P" "$IMG_FMT"
 
 
 }
@@ -117,11 +108,11 @@ function preprocess {
     export -f run_preproc
     export -f try
     local PRE4PARA=`parallel --shellquote ::: "$PREPROCESSOR"`
-    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: $* 
+    parallel -n 1 -d ::: -j $JOBS -m run_preproc "$PRE4PARA" {} ::: "$1"*_gs."$2"
     try "Error during parallel preprocessing!"
   else
     echo -e ${PENDING}Running$RESET preprocessor
-    for f ;do
+    for f in "$1"*_gs."$2";do
         run_preproc "$PREPROCESSOR" $f
     done
   fi
@@ -141,9 +132,10 @@ function ocr {
 
       export -f run_tess
       export -f try
+      export -f print_errors
 
       local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: $*
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: "$1"*_gs."$2"
       try "Error while running parallel tesseract jobs!"
       kill -INT $!
     else
@@ -151,7 +143,7 @@ function ocr {
       if [ $VERBOSE = false ];then
         run_wait
       fi
-      for f; do
+      for f in "$1"*_gs."$2"; do
         run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
       done
       kill -INT $!
@@ -166,25 +158,27 @@ function merge {
 
   if [[ $MODE = @(full|merge) ]]; then
 
-    local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
-    local file_count=`ls -1 "$IN_P"*_gs_tess.pdf | wc -l`
+    # local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+    local file_count=`ls -1 "$1"*_gs_tess.pdf | wc -l`
     echo -e ${PENDING}Merging$RESET into $OUT_FINAL
     if [[ $file_count -gt 1 ]]; then
-      pdfunite $* "$OUT_FINAL"
+      pdfunite "$1"*_gs_tess.pdf "$OUT_FINAL"
     else
-      cp "$*" "$OUT_FINAL"
+      cp "$1"*_gs_tess.pdf "$OUT_FINAL"
     fi
-    try "Error while merging $* into $OUT_FINAL"
+    try "Error while merging $1"*"$2 into $OUT_FINAL"
   fi
 
 }
 
 function clean_tmp {
-
   if [ $KEEP_TMP = false ]; then
-
-    rm -f $*
-
+    if [[ $MODE != split ]]; then
+      rm "$1"*_gs."$2"
+    fi
+    if [[ $MODE != ocr ]]; then
+      rm "$1"*_gs_tess.pdf
+    fi
   fi
 }
 
@@ -412,7 +406,7 @@ function check_req {
 
 function check_file {
 
-  if ! [ -f $1 ]; then
+  if ! [ -f "$1" ]; then
     throw "No such file: $1"
   fi
 
