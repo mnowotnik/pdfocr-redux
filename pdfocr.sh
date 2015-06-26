@@ -113,7 +113,7 @@ function preprocess {
   else
     echo -e ${PENDING}Running$RESET preprocessor
     for f in "$1"*_gs."$2";do
-        run_preproc "$PREPROCESSOR" $f
+        run_preproc "$PREPROCESSOR" "$f"
     done
   fi
 
