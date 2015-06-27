@@ -334,7 +334,7 @@ function parse_args {
       MODE="$val"
       ;;
     -p|--parallel)
-      if which parallel >/dev/null; then
+      if hash parallel 2>/dev/null; then
         PARALLEL=true
         if [[ -n $val ]]; then
           JOBS=$val
@@ -383,17 +383,17 @@ function parse_args {
 
 function check_req {
 
-  if ! which pdfunite > /dev/null; then
+  if ! hash pdfunite 2> /dev/null; then
     echo pdfunite missing!
     exit
   fi
 
-  if ! which tesseract > /dev/null; then
+  if ! hash tesseract 2> /dev/null; then
     echo tesseract missing!
     exit
   fi
 
-  if ! which gs > /dev/null; then
+  if ! hash gs 2> /dev/null; then
     echo ghostscript missing!
     exit
   fi
