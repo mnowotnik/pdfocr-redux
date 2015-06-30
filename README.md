@@ -5,7 +5,7 @@ Your typical pdfocr bash script revisited! All the flexibility and speed is
 already here. Not to mention new handy features to blow your socks off. 
 
 PDFOCR implements a pipeline for creating a searchable
-pdf file. The pipeline involves three parts:
+pdf file. The pipeline involves four parts:
   - pdf splitting and conversion to images
   - user-defined image preprocessing
   - character recognition
