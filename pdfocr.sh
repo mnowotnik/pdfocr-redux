@@ -200,7 +200,7 @@ function run_tess {
   tess_o=$(tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG   2>&1)
   try "Error while performing ocr!" "$tess_o"
 
-  if [ verbose = true ]; then
+  if [ $VERBOSE = true ]; then
     echo $tess_o
     echo Tesseract input $1 
     echo Tesseract output ${1%.*}_tess.pdf
