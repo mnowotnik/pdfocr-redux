@@ -515,7 +515,7 @@ Options:
   -r, --resolution  RES     set the resolution of intermediate images to RES;
                             default: 300
 
-      --tess-params         set the tesseract parameters; those should be inside
+      --tess-params "PARAMS" set the tesseract parameters; those should be inside
                             double quotes e.g., "-c textord_min_linesize=2.5"
 
   -h, --help                print this
