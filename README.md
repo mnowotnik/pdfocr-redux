@@ -116,7 +116,7 @@ all-purpose ocr script, not just for creating searchable pdfs.
     -r, --resolution RES        set the resolution of the intermediate images;
                                 Default: 300
 
-        --tess-params           set the tesseract parameters; those should be
+        --tess-params "PARAMS"  set the tesseract parameters; those should be
                                 inside double quotes e.g., 
                                 "-c textord_min_linesize=2.5"
 
