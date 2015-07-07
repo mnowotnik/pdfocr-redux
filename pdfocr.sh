@@ -213,14 +213,6 @@ function run_preproc {
       try "Error while preprocessing!" "Preprocessor: $1" "Input file: $2"
 }
 
-function exit_on_mode {
-
-  if [[ $1 = @(split|ocr) ]];then
-    continue
-  fi
-
-}
-
 function init {
 
   local INPUT=$1
