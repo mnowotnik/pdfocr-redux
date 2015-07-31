@@ -126,7 +126,7 @@ function ocr {
     local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
     if [ $PARALLEL = true ]; then
       echo -e ${PENDING}Running$RESET tesseract in parallel
-      if [ $VERBOSE = false ];then
+      if [ "$VERBOSE" = false ];then
         run_wait
       fi
 
@@ -134,17 +134,21 @@ function ocr {
       export -f try
       export -f print_errors
 
+      if [ -z "$TESS_PARAMS"]; then
+        TESS_PARAMS=" "
+      fi
+
       local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" $VERBOSE ::: "$1"*_gs."$2"
+      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" "$VERBOSE" ::: "$1"*_gs."$2"
       try "Error while running parallel tesseract jobs!"
       kill -INT $!
     else
       echo -e ${PENDING}Running$RESET tesseract
-      if [ $VERBOSE = false ];then
+      if [ "$VERBOSE" = false ];then
         run_wait
       fi
       for f in "$1"*_gs."$2"; do
-        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG"
+        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG" "$VERBOSE"
       done
       kill -INT $!
     fi
@@ -197,10 +201,14 @@ function run_tess {
   local TESS_CONFIG=$4
   local VERBOSE=$5
   local tess_o=
+  if [ "$VERBOSE" = true ]; then
+    echo tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG
+fi
+
   tess_o=$(tesseract "$IN" "${IN%.*}_tess" -l $TESS_LANG -psm 3 $TESS_PARAMS $TESS_CONFIG   2>&1)
   try "Error while performing ocr!" "$tess_o"
 
-  if [ $VERBOSE = true ]; then
+  if [ "$VERBOSE" = true ]; then
     echo $tess_o
     echo Tesseract input $1 
     echo Tesseract output ${1%.*}_tess.pdf
@@ -304,7 +312,7 @@ function parse_args {
     -t|--tempdir)
       TMPDIR_PATH="$val"
       ;;
-    -tess-config|-c)
+    --tess-config)
       TESS_CONFIG="$val"
       ;;
     -l|--language)
@@ -316,8 +324,8 @@ function parse_args {
     -f|--img-format)
       GSDEV="$val"
       ;;
-    --tess-params)
-      TESS_PARAMS="$val"
+    -c|--tess-param)
+      TESS_PARAMS="$TESS_PARAMS -c $val"
       ;;
     --keep-tmp)
       KEEP_TMP=true
@@ -457,7 +465,7 @@ Usage:
 
 Options:
 
--l, --lang LANGS            set the language(s) for tesseract; check available
+  -l, --lang LANGS            set the language(s) for tesseract; check available
                             languages with: 
                                 tesseract --list-langs
 
@@ -486,7 +494,7 @@ Options:
                             TMPDIR_PATH; modes 'split' and 'ocr' don't delete
                             their output intermediate files
 
-  -c, --tess-config         set the tesseract configuration; default: pdf
+      --tess-config         set the tesseract configuration; default: pdf
 
   -p, --parallel [JOBS]     use GNU parallel if available; limit the number
                             of jobs to JOBS
@@ -507,8 +515,8 @@ Options:
   -r, --resolution  RES     set the resolution of intermediate images to RES;
                             default: 300
 
-      --tess-params "PARAMS" set the tesseract parameters; those should be inside
-                            double quotes e.g., "-c textord_min_linesize=2.5"
+  -c, --tess-param key=val  set a tesseract parameter 
+                            e.g., -c textord_min_linesize=2.5
 
   -h, --help                print this
 
@@ -527,15 +535,15 @@ Usage:
 Options:
 
   -h, --help                print help
-  -l, --lang LANGS         set the language(s) for tesseract
+  -l, --lang LANGS          set the language(s) for tesseract
   -o, --output OUTPUT_PATH  set the output path
   -t, --tempdir TMPDIR_PATH set the path to tempdir (def: ~/tmp)
   -m, --mode MODE           set the mode (split,ocr,merge,full)
-  -c, --tess-config CONFIG  set the tesseract configuration; default: pdf
+      --tess-config CONFIG  set the tesseract configuration; default: pdf
   -f, --img-format FMT      the format of the intermediate images; 
                               jpeg png* ppm tiff*
   -r, --resolution NUM      set the resolution of the intermediate images
-      --tess-params "PARAMS"  set the tesseract parameters
+  -c, --tess-param key=val  set a tesseract parameter
       --keep-tmp            keep the intermediate files; deleted by default
   -p, --parallel [JOBS]     use GNU parallel if available
   -v, --verbose             allow verbose output

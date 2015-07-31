@@ -95,7 +95,7 @@ all-purpose ocr script, not just for creating searchable pdfs.
                                 the TMPDIR_PATH; modes 'split' and 'ocr' don't
                                 delete their output intermediate files
 
-    -c, --tess-config           set the tesseract configuration; default: pdf
+        --tess-config           set the tesseract configuration; default: pdf
 
     -p, --parallel [JOBS]       use GNU parallel if available; limit the number
                                 of jobs to JOBS
@@ -116,9 +116,8 @@ all-purpose ocr script, not just for creating searchable pdfs.
     -r, --resolution RES        set the resolution of the intermediate images;
                                 Default: 300
 
-        --tess-params "PARAMS"  set the tesseract parameters; those should be
-                                inside double quotes e.g., 
-                                "-c textord_min_linesize=2.5"
+    -c, --tess-param key=val    set a tesseract parameter
+                                e.g., -c textord_min_linesize=2.5
 
     -h, --help                  print this
     
