@@ -87,18 +87,19 @@ function pdfocr_proc {
 
 function split  {
 
-  if [[ $MODE = @(full|split) ]];then
-    echo -e ${PENDING}Running$RESET ghostscript
-
-    local IN_F=$1
-
-    local GS_OUT="$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT"
-    gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
-      -o "$GS_OUT" -f "$IN_F" > /dev/null
-
-    try "Error while converting $IN_F"
-
+  if ! [[ $MODE = @(full|split) ]];then
+    return
   fi
+
+  echo -e ${PENDING}Running$RESET ghostscript
+
+  local IN_F=$1
+
+  local GS_OUT="$TMPDIR_PATH/$INPUT_BASENAME%04d_gs.$IMG_FMT"
+  gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=$GSDEV -r$RES -dTextAlphaBits=4 \
+    -o "$GS_OUT" -f "$IN_F" > /dev/null
+
+  try "Error while converting $IN_F"
 }
 
 function preprocess {
@@ -121,40 +122,47 @@ function preprocess {
 
 function ocr {
 
-  if [[ $MODE = @(full|ocr) ]]; then
+  if ! [[ $MODE = @(full|ocr) ]]; then
+    return 
+  fi
 
-    local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
-    if [ $PARALLEL = true ]; then
-      echo -e ${PENDING}Running$RESET tesseract in parallel
-      if [ "$VERBOSE" = false ];then
-        run_wait
-      fi
+  local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+  if [ $PARALLEL = true ]; then
+    echo -e ${PENDING}Running$RESET tesseract in parallel
+    if [ "$VERBOSE" = false ];then
+      run_wait
+    fi
 
-      export -f run_tess
-      export -f try
-      export -f print_errors
+    export -f run_tess
+    export -f try
+    export -f print_errors
 
-      if [ -z "$TESS_PARAMS" ]; then
-        TESS_PARAMS=" "
-      fi
+    if [ -z "$TESS_PARAMS" ]; then
+      TESS_PARAMS=" "
+    fi
 
-      local ESC=`echo $TESS_PARAMS| sed 's/-/__-/'`
-      ESC=`parallel --shellquote ::: "$ESC"`
-      echo escparam $ESC
-      parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" "$VERBOSE" ::: "$1"*_gs."$2"
-      try "Error while running parallel tesseract jobs!"
-      kill -INT $!
-    else
-      echo -e ${PENDING}Running$RESET tesseract
-      if [ "$VERBOSE" = false ];then
-        run_wait
-      fi
-      for f in "$1"*_gs."$2"; do
-        run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG" "$VERBOSE"
-      done
+    local ESC=`echo $TESS_PARAMS| sed 's/-/__-/'`
+    ESC=`parallel --shellquote ::: "$ESC"`
+    parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" "$VERBOSE" ::: "$1"*_gs."$2"
+    try "Error while running parallel tesseract jobs!"
+
+    if [ "$VERBOSE" = false ]; then
       kill -INT $!
     fi
 
+  else
+    echo -e ${PENDING}Running$RESET tesseract
+    if [ "$VERBOSE" = false ];then
+      run_wait
+    fi
+
+    for f in "$1"*_gs."$2"; do
+      run_tess "$f" "$TESS_LANG" "$TESS_PARAMS" "$TESS_CONFIG" "$VERBOSE"
+    done
+
+    if [ "$VERBOSE" = false ]; then
+      kill -INT $!
+    fi
   fi
 
 
@@ -162,29 +170,31 @@ function ocr {
 
 function merge {
 
-  if [[ $MODE = @(full|merge) ]]; then
-
-    # local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
-    local file_count=`ls -1 "$1"*_gs_tess.pdf | wc -l`
-    echo -e ${PENDING}Merging$RESET into $OUT_FINAL
-    if [[ $file_count -gt 1 ]]; then
-      pdfunite "$1"*_gs_tess.pdf "$OUT_FINAL"
-    else
-      cp "$1"*_gs_tess.pdf "$OUT_FINAL"
-    fi
-    try "Error while merging $1"*"$2 into $OUT_FINAL"
+  if ! [[ $MODE = @(full|merge) ]]; then
+    return
   fi
 
+  # local IN_P="$TMPDIR_PATH/$INPUT_BASENAME"
+  local file_count=`ls -1 "$1"*_gs_tess.pdf | wc -l`
+  echo -e ${PENDING}Merging$RESET into $OUT_FINAL
+  if [[ $file_count -gt 1 ]]; then
+    pdfunite "$1"*_gs_tess.pdf "$OUT_FINAL"
+  else
+    cp "$1"*_gs_tess.pdf "$OUT_FINAL"
+  fi
+  try "Error while merging $1"*"$2 into $OUT_FINAL"
 }
 
 function clean_tmp {
-  if [ $KEEP_TMP = false ]; then
-    if [[ $MODE != split ]]; then
-      rm "$1"*_gs."$2"
-    fi
-    if [[ $MODE != ocr ]]; then
-      rm "$1"*_gs_tess.pdf
-    fi
+  if [ $KEEP_TMP = true ]; then
+    return
+  fi
+
+  if [[ $MODE != split ]]; then
+    rm "$1"*_gs."$2"
+  fi
+  if [[ $MODE != ocr ]]; then
+    rm "$1"*_gs_tess.pdf
   fi
 }
 
