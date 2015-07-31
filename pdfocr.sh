@@ -507,7 +507,7 @@ Options:
                             TMPDIR_PATH; modes 'split' and 'ocr' don't delete
                             their output intermediate files
 
-      --tess-config         set the tesseract configuration; default: pdf
+      --tess-config CONFIG  set the tesseract configuration; default: pdf
 
   -p, --parallel [JOBS]     use GNU parallel if available; limit the number
                             of jobs to JOBS
