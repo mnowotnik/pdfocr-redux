@@ -134,11 +134,13 @@ function ocr {
       export -f try
       export -f print_errors
 
-      if [ -z "$TESS_PARAMS"]; then
+      if [ -z "$TESS_PARAMS" ]; then
         TESS_PARAMS=" "
       fi
 
-      local ESC=`parallel --shellquote ::: "$TESS_PARAMS"`
+      local ESC=`echo $TESS_PARAMS| sed 's/-/__-/'`
+      ESC=`parallel --shellquote ::: "$ESC"`
+      echo escparam $ESC
       parallel -n1 -j $JOBS -m run_tess {} "$TESS_LANG" "$ESC" "$TESS_CONFIG" "$VERBOSE" ::: "$1"*_gs."$2"
       try "Error while running parallel tesseract jobs!"
       kill -INT $!
@@ -198,6 +200,7 @@ function run_tess {
   local IN=$1
   local TESS_LANG=$2
   local TESS_PARAMS=$3
+  TESS_PARAMS=`echo $TESS_PARAMS | sed 's/__-/-/'`
   local TESS_CONFIG=$4
   local VERBOSE=$5
   local tess_o=
