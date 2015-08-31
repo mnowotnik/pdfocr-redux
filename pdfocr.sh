@@ -286,8 +286,7 @@ function init {
     IMG_FMT=tiff
     ;;
   *)
-    echo $IMG_FMT not supported
-    exit
+    throw "$IMG_FMT not supported"
     ;;
   esac
 }
@@ -397,51 +396,41 @@ function parse_args {
 function check_req {
 
   if ! hash pdfunite 2> /dev/null; then
-    echo pdfunite missing!
-    exit
+    throw "pdfunite missing!"
   fi
 
   if ! hash tesseract 2> /dev/null; then
-    echo tesseract missing!
-    exit
+    throw "tesseract missing!"
   fi
 
   if ! hash gs 2> /dev/null; then
-    echo ghostscript missing!
-    exit
+    throw "ghostscript missing!"
   fi
 
   if [ ${#INPUT_FILES[@]} -eq 0 ]; then
-    echo pdf input path is missing!
-    exit
+    throw "pdf input path is missing!"
   fi
 }
 
 function check_file {
-
   if ! [ -f "$1" ]; then
     throw "No such file: $1"
   fi
-
 }
 
 function try {
-
   if [[ $? -ne 0 ]] ; then
-    print_errors "$@"
-    exit 1
+    throw "$@"
   fi
   return 0
 }
  
 function throw {
-
   print_errors "$@"
   exit 1
 }
 
 function print_errors {
-
   for msg; do
     echo -e "$ERROR$msg$RESET"
   done
