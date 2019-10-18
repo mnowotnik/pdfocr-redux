@@ -314,7 +314,7 @@ function parse_args {
     -*)
       IN_ARG=
       let in_c=0
-     ;;& 
+     ;;
     -i|--input)
       IN_ARG=INPUT
       ;;
